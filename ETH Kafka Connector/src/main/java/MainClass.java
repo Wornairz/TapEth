@@ -1,17 +1,13 @@
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.WebSocket;
+import ethereum.EthereumWSSClient;
 
 public class MainClass {
 
 	public static void main(String[] args) {
-		if(args[0].startsWith("wss://")) {
+		/*if(args[0].startsWith("wss://")) {
 			String webSocketUrl = args[0];
-			OkHttpClient client = new OkHttpClient();
-	    	Request request = new Request.Builder().url(webSocketUrl).build();
-			WebSocket webSocket = client.newWebSocket(request, new EthereumWSSListener());
+			new EthereumWSSClient(webSocketUrl).start();
 		}
 		else
-			System.err.println("Provided url is not a websocket url");
+			System.err.println("Provided url is not a websocket url");*/
 	}
 }
