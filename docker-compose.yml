@@ -1,4 +1,4 @@
-version: "3"
+version: '3.7'
 services: 
   zookeeper:
     image: zookeeper
@@ -7,9 +7,19 @@ services:
       - 2181:2181
     container_name: "tap-zookeeper"
     networks: 
-      - tap
+      tap:
+        ipv4_address: "10.0.100.25"
+  kafka:
+    build: Kafka/
+    networks: 
+      tap:
+        ipv4_address: "10.0.100.25"
+    container_name: "tap-eth-kafka"
 
 networks: 
   tap:
-    driver: bridge
+    ipam: 
+      driver: bridge
+      config: 
+        - subnet: 10.0.100.0/24
     
