@@ -1,10 +1,11 @@
 FROM openjdk:8
 ENV PATH /opt/kafka/bin:$PATH
 ENV KAFKA_DIR "/opt/kafka"
+ENV ZOOKEEPER_SERVER "10.0.100.22:2181"
 
 ARG KAFKA_VERSION="2.12-2.5.0"
 
-RUN apt-get update && apt-get install telnet && apt-get install nano 
+RUN apt-get update
 
 # Installing Kafka
 # ADD will automatically extract the file
@@ -15,6 +16,9 @@ RUN ln -s /opt/kafka_${KAFKA_VERSION} ${KAFKA_DIR}
 
 # Copy All conf here
 COPY eth-source-connector.properties ${KAFKA_DIR}/conf/
-COPY worker.properties /opt/kafka/conf/
-
+COPY worker.properties ${KAFKA_DIR}/conf/
 COPY eth-connector-kafka-* /usr/local/share/kafka/plugins/
+COPY kafka-starter.sh ${KAFKA_DIR}
+
+WORKDIR ${KAFKA_DIR}
+CMD ./kafka-starter.sh
