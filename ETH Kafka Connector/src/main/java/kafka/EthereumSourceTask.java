@@ -35,7 +35,7 @@ public class EthereumSourceTask extends SourceTask {
 	public List<SourceRecord> poll() throws InterruptedException {
 		List<SourceRecord> records = new ArrayList<>();
 		while (records.isEmpty() && !queue.isEmpty()) {
-			String block = queue.peek();
+			String block = queue.remove();
 			SourceRecord record = new SourceRecord(offsetKey(ethereumWssUri), offsetValue(count++), kafkaTopic,
 					Schema.STRING_SCHEMA, block);
 			records.add(record);

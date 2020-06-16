@@ -1,15 +1,15 @@
 package ethereum;
 
-import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 public class EthereumBlocksQueue {
 
-	private Queue<String> queue;
+	private BlockingQueue<String> queue;
 	private static EthereumBlocksQueue instance;
 	
 	private EthereumBlocksQueue() {
-		queue = new ConcurrentLinkedQueue<>();
+		queue = new LinkedBlockingQueue<>();
 	}
 	
 	public static EthereumBlocksQueue getInstance() {
@@ -22,8 +22,13 @@ public class EthereumBlocksQueue {
 		queue.add(s);
 	}
 	
-	public String peek() {
-		return queue.peek();
+	public String remove() {
+		try {
+			return queue.take();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+			return null;
+		}
 	}
 	
 	public boolean isEmpty() {
