@@ -1,4 +1,4 @@
-wss = wss://mainnet.infura.io/ws/v3/b8c47bf19cac4d448b3b329f89b0460e
+wss = MY_ETHEREUM_JSON-RPC_SERVER_WSS_URI
 connector.class = kafka.EthereumSourceConnector
 tasks.max = 1
 topic = tap

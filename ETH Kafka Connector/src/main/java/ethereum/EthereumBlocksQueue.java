@@ -19,7 +19,11 @@ public class EthereumBlocksQueue {
 	}
 	
 	public void add(String s) {
-		queue.add(s);
+		try {
+			queue.put(s);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
 	}
 	
 	public String remove() {

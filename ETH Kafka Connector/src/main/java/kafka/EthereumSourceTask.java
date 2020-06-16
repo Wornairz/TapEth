@@ -13,7 +13,7 @@ import ethereum.EthereumBlocksQueue;
 
 public class EthereumSourceTask extends SourceTask {
 
-	private String ethereumWssUri;
+	private final String OFFSET_KEY = "Ethereum WSS";
 	private String kafkaTopic;
 	private EthereumBlocksQueue queue;
 	private Long count;
@@ -25,7 +25,6 @@ public class EthereumSourceTask extends SourceTask {
 
 	@Override
 	public void start(Map<String, String> props) {
-		ethereumWssUri = props.get("wss");
 		kafkaTopic = props.get("topic");
 		queue = EthereumBlocksQueue.getInstance();
 		count = 0L;
@@ -34,9 +33,9 @@ public class EthereumSourceTask extends SourceTask {
 	@Override
 	public List<SourceRecord> poll() throws InterruptedException {
 		List<SourceRecord> records = new ArrayList<>();
-		while (records.isEmpty() && !queue.isEmpty()) {
+		while (!queue.isEmpty()) {
 			String block = queue.remove();
-			SourceRecord record = new SourceRecord(offsetKey(ethereumWssUri), offsetValue(count++), kafkaTopic,
+			SourceRecord record = new SourceRecord(offsetKey(OFFSET_KEY), offsetValue(count++), kafkaTopic,
 					Schema.STRING_SCHEMA, block);
 			records.add(record);
 		}

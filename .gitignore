@@ -1,2 +1,3 @@
 **/.settings/
 **/target/
+Kafka/eth-source-connector.properties

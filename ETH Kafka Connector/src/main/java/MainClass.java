@@ -10,7 +10,7 @@ public class MainClass {
 			EthereumBlocksQueue queue = EthereumBlocksQueue.getInstance();
 			while (true) {
 				String s = queue.remove();
-				System.out.println("CODA S : " + s);
+				System.out.println("Read from queue: " + s);
 			}
 			
 		}

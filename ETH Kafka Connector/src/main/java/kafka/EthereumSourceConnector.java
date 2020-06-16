@@ -26,6 +26,7 @@ public class EthereumSourceConnector extends SourceConnector {
 
 	@Override
 	public void start(Map<String, String> props) {
+		//Read configuration from .properties file
 		ethereumWssUri = props.get("wss");
 		kafkaTopic = props.get("topic");
 		ethereumWssClient = new EthereumWSSClient(ethereumWssUri);
@@ -39,10 +40,10 @@ public class EthereumSourceConnector extends SourceConnector {
 
 	@Override
 	public List<Map<String, String>> taskConfigs(int maxTasks) {
+		//Write configuration to pass to each task
 		List<Map<String, String>> configs = new ArrayList<>();
 		Map<String, String> config = new HashMap<>();
-		config.put("wss", "wss://mainnet.infura.io/ws/v3/b8c47bf19cac4d448b3b329f89b0460e");
-		config.put("topic", "tap");
+		config.put("topic", kafkaTopic);
 		configs.add(config);
 		return configs;
 	}
