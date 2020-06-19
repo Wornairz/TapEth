@@ -15,6 +15,12 @@ services:
       tap:
         ipv4_address: "10.0.100.25"
     container_name: "tap-eth-kafka"
+  spark:
+    build: Spark/
+    networks: 
+      tap:
+        ipv4_address: "10.0.100.42"
+    container_name: "tap-eth-spark"
 
 networks: 
   tap:
