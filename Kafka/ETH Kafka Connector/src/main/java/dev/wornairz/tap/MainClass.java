@@ -1,5 +1,6 @@
-import ethereum.EthereumBlocksQueue;
-import ethereum.EthereumWSSClient;
+package dev.wornairz.tap;
+import dev.wornairz.tap.ethereum.EthereumBlocksQueue;
+import dev.wornairz.tap.ethereum.EthereumWSSClient;
 
 public class MainClass {
 

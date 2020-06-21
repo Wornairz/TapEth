@@ -1,4 +1,4 @@
-package ethereum;
+package dev.wornairz.tap.ethereum;
 
 import okhttp3.OkHttpClient;
 import okhttp3.Request;

@@ -1,4 +1,4 @@
-package kafka;
+package dev.wornairz.tap.kafka;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -9,7 +9,7 @@ import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.apache.kafka.connect.source.SourceTask;
 
-import ethereum.EthereumBlocksQueue;
+import dev.wornairz.tap.ethereum.EthereumBlocksQueue;
 
 public class EthereumSourceTask extends SourceTask {
 

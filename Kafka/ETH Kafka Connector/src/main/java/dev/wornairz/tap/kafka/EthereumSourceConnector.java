@@ -1,4 +1,4 @@
-package kafka;
+package dev.wornairz.tap.kafka;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -11,7 +11,7 @@ import org.apache.kafka.common.config.ConfigDef.Type;
 import org.apache.kafka.connect.connector.Task;
 import org.apache.kafka.connect.source.SourceConnector;
 
-import ethereum.EthereumWSSClient;
+import dev.wornairz.tap.ethereum.EthereumWSSClient;
 
 public class EthereumSourceConnector extends SourceConnector {
 
