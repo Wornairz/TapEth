@@ -13,15 +13,27 @@ import java.util.Map;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 import org.apache.spark.SparkConf;
+import org.apache.spark.api.java.JavaRDD;
+import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.api.java.function.MapFunction;
 import org.apache.spark.ml.feature.VectorAssembler;
 import org.apache.spark.ml.regression.LinearRegression;
 import org.apache.spark.ml.regression.LinearRegressionModel;
 import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.RowFactory;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.catalyst.encoders.RowEncoder;
+
+import static org.apache.spark.sql.functions.conv;
+import static org.apache.spark.sql.functions.col;
+import static org.apache.spark.sql.functions.lit;
 import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.streaming.Durations;
@@ -38,12 +50,16 @@ import scala.Tuple2;
 
 public class MainClass {
 
+	private static SparkSession spark;
+	private static LinearRegressionModel lrModel;
+	private static Logger log = Logger.getLogger(MainClass.class);
+
 	public static void main(String[] args) throws Exception {
 		SparkConf sparkConf = new SparkConf().setAppName("Ethereum Spark").setMaster("local[2]");
 		sparkConf.set("es.index.auto.create", "true");
-
-		SparkSession spark = SparkSession.builder().config(sparkConf).getOrCreate();
-
+		spark = SparkSession.builder().config(sparkConf).getOrCreate();
+		spark.sparkContext().setLogLevel("WARN");
+		
 		HttpClient client = HttpClient.newHttpClient();
 		String prediction = client.send(HttpRequest.newBuilder(new URI(
 				"https://ethgasstation.info/api/predictTable.json?api-key=0dd9fc3a3da130f1ad75664d09f4f849b7638819615c7d6cca229a7c943c"))
@@ -62,10 +78,11 @@ public class MainClass {
 
 		LinearRegression lr = new LinearRegression().setMaxIter(10).setRegParam(0.3).setElasticNetParam(0.8);
 
-		LinearRegressionModel lrModel = lr.fit(training);
+		lrModel = lr.fit(training);
 		printModelStats(lrModel);
 
-		JavaStreamingContext streamingContext = new JavaStreamingContext(sparkConf, Durations.seconds(1));
+		JavaStreamingContext streamingContext = new JavaStreamingContext(
+				JavaSparkContext.fromSparkContext(spark.sparkContext()), Durations.seconds(1));
 
 		Map<String, Object> kafkaParams = getKafkaStreamingConfig();
 		Collection<String> topics = Arrays.asList("tap");
@@ -75,16 +92,35 @@ public class MainClass {
 				ConsumerStrategies.<String, String>Subscribe(topics, kafkaParams));
 
 		messageStream.mapToPair(record -> new Tuple2<>(record.key(), record.value())).map(tuple2 -> tuple2._2)
-				.foreachRDD(rdd -> {
-					List<String> blocks = rdd.collect();
-					if (!blocks.isEmpty())
-						System.out.println(blocks);
-				});
+				.foreachRDD(MainClass::convertRDDtoDataset);
 
 		streamingContext.start();
 		streamingContext.awaitTermination();
 
-		//spark.stop();
+		// spark.stop();
+	}
+
+	private static void convertRDDtoDataset(JavaRDD<String> rdd) {
+		JavaRDD<Row> rowRDD = rdd.map(s -> RowFactory.create(s));
+		Dataset<Row> dataset = spark.read().json(rdd);
+		if (!dataset.isEmpty()) {
+			dataset = dataset.drop("blockHash", "transactionIndex", "nonce", "input", "r", "s", "v", "blockNumber",
+					"gas", "from", "to", "value", "hash");
+			dataset.show();
+			dataset = dataset.map((MapFunction<Row, Row>) MainClass::convertGasPriceToDouble, RowEncoder.apply(new StructType(new StructField[]{new StructField("gasPrice", DataTypes.DoubleType, false, Metadata.empty())})));
+			dataset = dataset.withColumn("gasPrice", conv(col("gasPrice"), 16, 10).cast(DataTypes.DoubleType));
+			dataset = new VectorAssembler().setInputCols(new String[] { "gasPrice" }).setOutputCol("features")
+					.transform(dataset).withColumn("label", lit(1d).cast(DataTypes.DoubleType));
+			dataset.show();
+			lrModel.transform(dataset).show();		
+		}
+	}
+	
+	private static Row convertGasPriceToDouble(Row row) {
+		String hexGasPrice = row.getString(0).substring(2);
+		long gasPriceInWei = Long.parseLong(hexGasPrice, 16);
+		double gasPriceInGwei = gasPriceInWei/1000000000;
+		return RowFactory.create(gasPriceInGwei);
 	}
 
 	private static void printModelStats(LinearRegressionModel lrModel) {
@@ -93,14 +129,6 @@ public class MainClass {
 		System.out.println("Mean Absolute Error: " + lrModel.summary().meanAbsoluteError());
 		System.out.println("Mean Squared Error: " + lrModel.summary().meanSquaredError());
 		System.out.println("Root Mean Squared Error: " + lrModel.summary().rootMeanSquaredError());
-		// System.out.println("Coefficient standard errors: " +
-		// lrModel.summary().coefficientStandardErrors());
-		// System.out.println("Deviance residuals: " +
-		// lrModel.summary().devianceResiduals());
-		// System.out.println("Objective history: " +
-		// lrModel.summary().objectiveHistory());
-		// System.out.println("P-Values: " + lrModel.summary().pValues());
-		// System.out.println("T-Values: " + List.of(lrModel.summary().tValues()));
 	}
 
 	private static StructType getSchema() {
