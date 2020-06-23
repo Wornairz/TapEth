@@ -1,20 +1,20 @@
-FROM openjdk:8
+FROM maven:latest
 
 ENV SPARK_VERSION=3.0.0
 ENV SPARK_DIR=/opt/spark
 ENV PATH $SPARK_DIR/bin:$PATH
+ENV ETH_SPARK_STREAMING "ETH Spark Streaming"
+ENV ETH_SPARK_DIR "/opt/spark-eth/"
 
 ADD spark-${SPARK_VERSION}-bin-hadoop2.7.tgz /opt
-
-RUN apt-get update
-
-# Create Sym Link 
 RUN ln -s /opt/spark-${SPARK_VERSION}-bin-hadoop2.7 ${SPARK_DIR} 
 
-# Add Java Code
-COPY eth-spark-streaming-0.0.1-SNAPSHOT.jar /opt/spark-eth/
-# Add Spark Manager
-COPY spark-starter.sh /opt/spark-eth/
+COPY ${ETH_SPARK_STREAMING} ${ETH_SPARK_DIR}
+WORKDIR ${ETH_SPARK_DIR}
+RUN mvn package
+RUN cp target/eth-spark-streaming-* ${ETH_SPARK_DIR}
 
-WORKDIR /opt/spark-eth
+
+COPY spark-starter.sh ${ETH_SPARK_DIR}
+WORKDIR ${ETH_SPARK_DIR}
 CMD ./spark-starter.sh
