@@ -21,6 +21,39 @@ services:
       tap:
         ipv4_address: "10.0.100.42"
     container_name: "tap-eth-spark"
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.8.0
+    container_name: "tap-es"
+    environment:
+      - node.name=estap
+      - cluster.name=es-docker-cluster
+      - cluster.initial_master_nodes=estap
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - 9200:9200
+    networks: 
+      tap:
+        ipv4_address: "10.0.100.51"
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.8.0
+    container_name: "tap-kibana"
+    ports:
+      - 5601:5601
+    environment:
+      ELASTICSEARCH_URL: http://10.0.100.51:9200
+      ELASTICSEARCH_HOSTS: http://10.0.100.51:9200
+      MONITORING_ENABLED: "false"
+    networks: 
+      tap:
+        ipv4_address: "10.0.100.52"
 
 networks: 
   tap:
