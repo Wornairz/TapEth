@@ -33,6 +33,10 @@ public class EthereumWSSListener extends WebSocketListener {
 	@Override
 	public void onMessage(WebSocket webSocket, String text) {
 		JSONObject response = new JSONObject(text);
+		if(response.has("error")) {
+			log.error(response.toString());
+			System.exit(response.getJSONObject("error").getInt("code"));
+		}
 		log.debug(response.toString());
 		if (response.has("params")) {
 			String transactionHash = response.getJSONObject("params").getString("result");

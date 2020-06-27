@@ -31,6 +31,8 @@ import org.apache.spark.sql.catalyst.encoders.RowEncoder;
 
 import static org.apache.spark.sql.functions.conv;
 import static org.apache.spark.sql.functions.col;
+import static org.apache.spark.sql.functions.lit;
+import static org.apache.spark.sql.functions.current_timestamp;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
@@ -64,7 +66,7 @@ public class MainClass {
 		
 		training = new VectorAssembler().setInputCols(new String[] { "gasprice" }).setOutputCol("gas_price")
 				.transform(training).drop("gasprice");
-		training.show(false);
+		training.show(100, false);
 
 		LinearRegression lr = new LinearRegression()
 				.setMaxIter(10).setRegParam(0.3).setElasticNetParam(0.8)
@@ -124,7 +126,6 @@ public class MainClass {
 	}
 
 	private static void convertRDDtoDataset(JavaRDD<String> rdd) {
-		JavaRDD<Row> rowRDD = rdd.map(s -> RowFactory.create(s));
 		Dataset<Row> dataset = spark.read().json(rdd);
 		if (!dataset.isEmpty()) {
 			dataset = dataset.drop("blockHash", "transactionIndex", "nonce", "input", "r", "s", "v", "blockNumber",
@@ -133,8 +134,8 @@ public class MainClass {
 				.withColumn("gasPrice", conv(col("gasPrice"), 16, 10).cast(DataTypes.DoubleType));
 			dataset = new VectorAssembler().setInputCols(new String[] { "gasPrice" }).setOutputCol("gas_price")
 					.transform(dataset).drop("gasPrice");
-			Dataset<Row> predictionDataset = lrModel.transform(dataset);
-			predictionDataset.show();
+			Dataset<Row> predictionDataset = lrModel.transform(dataset).withColumn("timestamp", lit(current_timestamp().cast(DataTypes.TimestampType)));
+			predictionDataset.show(100, false);
 			JavaEsSpark.saveJsonToEs(predictionDataset.toJSON().toJavaRDD(), "tap/eth");
 		}
 	}
