@@ -31,7 +31,6 @@ import org.apache.spark.sql.catalyst.encoders.RowEncoder;
 
 import static org.apache.spark.sql.functions.conv;
 import static org.apache.spark.sql.functions.col;
-import static org.apache.spark.sql.functions.lit;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
@@ -55,30 +54,24 @@ public class MainClass {
 	private static Logger log = Logger.getLogger(MainClass.class);
 
 	public static void main(String[] args) throws Exception {
-		SparkConf sparkConf = new SparkConf().setAppName("Ethereum Spark").setMaster("local[2]");
-		sparkConf.set("es.index.auto.create", "true");
-		sparkConf.set("es.nodes", "10.0.100.51");
-		sparkConf.set("es.resource", "tap/eth");
-		sparkConf.set("es.input.json", "yes");
-	    //sparkConf.set("es.nodes.wan.only", "true");
+		SparkConf sparkConf = getSparkConf();
 	    
 		spark = SparkSession.builder().config(sparkConf).getOrCreate();
-		spark.sparkContext().setLogLevel("WARN");
+		spark.sparkContext().setLogLevel("ERROR");
 		
 		JSONArray predictionJson = getPredictionJson();
+		Dataset<Row> training = createPredictionDataset(predictionJson);
+		
+		training = new VectorAssembler().setInputCols(new String[] { "gasprice" }).setOutputCol("gas_price")
+				.transform(training).drop("gasprice");
+		training.show(false);
 
-		List<Row> data = new ArrayList<>();
-		for (int i = 0; i < predictionJson.length(); i++) {
-			JSONObject object = predictionJson.getJSONObject(i);
-			data.add(RowFactory.create(object.getDouble("gasprice"), object.getDouble("expectedTime")));
-		}
-		Dataset<Row> training = spark.createDataFrame(data, getSchema());
-		training = new VectorAssembler().setInputCols(new String[] { "gasprice" }).setOutputCol("features")
-				.transform(training).withColumnRenamed("expectedTime", "label");
-		training.show();
-
-		LinearRegression lr = new LinearRegression().setMaxIter(10).setRegParam(0.3).setElasticNetParam(0.8);
-
+		LinearRegression lr = new LinearRegression()
+				.setMaxIter(10).setRegParam(0.3).setElasticNetParam(0.8)
+				.setFeaturesCol("gas_price")
+				.setLabelCol("expectedTime")
+				.setPredictionCol("expected_time");
+		
 		lrModel = lr.fit(training);
 		printModelStats(lrModel);
 
@@ -101,6 +94,26 @@ public class MainClass {
 		// spark.stop();
 	}
 
+	private static Dataset<Row> createPredictionDataset(JSONArray predictionJson) {
+		List<Row> data = new ArrayList<>();
+		for (int i = 0; i < predictionJson.length(); i++) {
+			JSONObject object = predictionJson.getJSONObject(i);
+			data.add(RowFactory.create(object.getDouble("gasprice"), object.getDouble("expectedTime")));
+		}
+		Dataset<Row> training = spark.createDataFrame(data, getSchema());
+		return training;
+	}
+
+	private static SparkConf getSparkConf() {
+		SparkConf sparkConf = new SparkConf().setAppName("Ethereum Spark").setMaster("local[2]");
+		sparkConf.set("es.index.auto.create", "true");
+		sparkConf.set("es.nodes", "10.0.100.51");
+		sparkConf.set("es.resource", "tap/eth");
+		sparkConf.set("es.input.json", "yes");
+	    //sparkConf.set("es.nodes.wan.only", "true");
+		return sparkConf;
+	}
+
 	private static JSONArray getPredictionJson() throws IOException, InterruptedException, URISyntaxException {
 		HttpClient client = HttpClient.newHttpClient();
 		String prediction = client.send(HttpRequest.newBuilder(new URI(
@@ -118,8 +131,8 @@ public class MainClass {
 					"gas", "from", "to", "value", "hash");
 			dataset = dataset.map((MapFunction<Row, Row>) MainClass::convertGasPriceToDouble, RowEncoder.apply(new StructType(new StructField[]{new StructField("gasPrice", DataTypes.DoubleType, false, Metadata.empty())})))
 				.withColumn("gasPrice", conv(col("gasPrice"), 16, 10).cast(DataTypes.DoubleType));
-			dataset = new VectorAssembler().setInputCols(new String[] { "gasPrice" }).setOutputCol("features")
-					.transform(dataset).withColumn("label", lit(1d).cast(DataTypes.DoubleType));
+			dataset = new VectorAssembler().setInputCols(new String[] { "gasPrice" }).setOutputCol("gas_price")
+					.transform(dataset).drop("gasPrice");
 			Dataset<Row> predictionDataset = lrModel.transform(dataset);
 			predictionDataset.show();
 			JavaEsSpark.saveJsonToEs(predictionDataset.toJSON().toJavaRDD(), "tap/eth");
