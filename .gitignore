@@ -1,3 +1,4 @@
 **/.settings/
 **/target/
 Kafka/eth-source-connector.properties
+**/ethgasstation-apikey.txt
