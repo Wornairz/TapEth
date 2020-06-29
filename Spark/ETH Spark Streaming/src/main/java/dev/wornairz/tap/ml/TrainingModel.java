@@ -25,7 +25,7 @@ import org.json.JSONObject;
 import dev.wornairz.tap.MainClass;
 import dev.wornairz.tap.spark.SparkWrapper;
 
-public class PredictionUtils {
+public class TrainingModel {
 	
 	private static String apiKey;
 	private static Logger log = Logger.getLogger(MainClass.class);
@@ -39,8 +39,8 @@ public class PredictionUtils {
 		}
 	}
 	
-	public static Dataset<Row> getPredictionDataset() {
-		JSONArray predictionJson = getPredictionJson();
+	public static Dataset<Row> getTrainingDataset() {
+		JSONArray predictionJson = getTrainingJson();
 		Dataset<Row> training = createPredictionDataset(predictionJson);
 		training = new VectorAssembler().setInputCols(new String[] { "gasprice" }).setOutputCol("gas_price")
 				.transform(training).drop("gasprice");
@@ -48,7 +48,7 @@ public class PredictionUtils {
 		return training;
 	}
 	
-	private static JSONArray getPredictionJson() {
+	private static JSONArray getTrainingJson() {
 		HttpClient client = HttpClient.newHttpClient();
 		String prediction = "[]";
 		try {

@@ -1,4 +1,4 @@
-wss = MY_ETHEREUM_JSON-RPC_SERVER_WSS_URI
+wss = YOUR_ETHEREUM_JSON-RPC_SERVER_WSS_URI
 connector.class = dev.wornairz.tap.kafka.EthereumSourceConnector
 tasks.max = 1
 topic = tap

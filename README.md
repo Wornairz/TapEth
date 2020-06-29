@@ -3,6 +3,8 @@
 TapEth (**T**echnologies for **A**dvanced **P**rogramming - **ETH**ereum) is a university project.
 The main goal of this project is to statistically analyze pending transaction on one [Ethereum](https://ethereum.org/) network (e.g. the main network) to predict the estimated waiting time for each transaction before being mined in a block.
 
+**N.B.** Some large files, like Kafka or Spark packages, are hosted in GitHub using **git-lfs**.
+
 ### Technologies used
 
 The **data pipeline** is composed of the following steps:

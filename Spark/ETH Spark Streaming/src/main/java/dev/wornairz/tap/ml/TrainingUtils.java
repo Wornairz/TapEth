@@ -9,7 +9,7 @@ public class TrainingUtils {
 
 	public static LinearRegressionModel getLinearRegressionPredictionModel() {
 		LinearRegressionModel lrModel;
-		Dataset<Row> training = PredictionUtils.getPredictionDataset();
+		Dataset<Row> training = TrainingModel.getTrainingDataset();
 		LinearRegression lr = new LinearRegression().setMaxIter(100).setRegParam(0.3).setElasticNetParam(0.8)
 				.setFeaturesCol("gas_price").setLabelCol("expectedTime").setPredictionCol("expected_time");
 		lrModel = lr.fit(training);
