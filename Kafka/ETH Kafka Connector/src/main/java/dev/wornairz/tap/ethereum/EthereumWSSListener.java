@@ -24,46 +24,58 @@ public class EthereumWSSListener extends WebSocketListener {
 
 	@Override
 	public void onOpen(WebSocket webSocket, Response response) {
-		System.out.println("Connected successfully");
+		log = LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
+		log.info("WebSocket connected successfully");
 		queue = EthereumBlocksQueue.getInstance();
 		webSocket.send(subscribeJson.toString());
-		log = LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
 	}
 
 	@Override
 	public void onMessage(WebSocket webSocket, String text) {
 		JSONObject response = new JSONObject(text);
+		log.debug(response.toString());
 		if(response.has("error")) {
 			log.error(response.toString());
 			System.exit(response.getJSONObject("error").getInt("code"));
 		}
-		log.debug(response.toString());
-		if (response.has("params")) {
-			String transactionHash = response.getJSONObject("params").getString("result");
-			JSONObject getTransactionByHashRequest = new JSONObject(getTransactionByHashJson.toString());
-			JSONArray paramsArray = new JSONArray();
-			paramsArray.put(transactionHash);
-			getTransactionByHashRequest.put("params", paramsArray);
-			log.debug(getTransactionByHashRequest.toString());
-			CompletableFuture.runAsync(() -> webSocket.send(getTransactionByHashRequest.toString()),
-					CompletableFuture.delayedExecutor(30L, TimeUnit.SECONDS));
-		} else if (response.has("result")) {
-			try {
-				queue.add(response.getJSONObject("result").toString());
-			} catch (JSONException e) {
-				//log.warn(response.toString());
-			}
+		else if (response.has("params"))
+			sendGetTransactionByHashRequest(webSocket, response);
+		else if (response.has("result"))
+			addResponseToQueue(response);
+	}
+
+	private void sendGetTransactionByHashRequest(WebSocket webSocket, JSONObject response) {
+		String transactionHash = response.getJSONObject("params").getString("result");
+		JSONObject getTransactionByHashRequest = createGetTransactionByHashRequest(transactionHash);
+		CompletableFuture.runAsync(() -> webSocket.send(getTransactionByHashRequest.toString()),
+				CompletableFuture.delayedExecutor(30L, TimeUnit.SECONDS));
+	}
+
+	private JSONObject createGetTransactionByHashRequest(String transactionHash) {
+		JSONObject getTransactionByHashRequest = new JSONObject(getTransactionByHashJson.toString());
+		JSONArray paramsArray = new JSONArray();
+		paramsArray.put(transactionHash);
+		getTransactionByHashRequest.put("params", paramsArray);
+		log.debug(getTransactionByHashRequest.toString());
+		return getTransactionByHashRequest;
+	}
+
+	private void addResponseToQueue(JSONObject response) {
+		try {
+			queue.add(response.getJSONObject("result").toString());
+		} catch (JSONException e) {
+			log.debug(response.toString());
 		}
 	}
 
 	@Override
 	public void onClosed(WebSocket webSocket, int code, String reason) {
-		System.out.println("Connection closed");
+		log.warn("Connection closed");
 	}
 
 	@Override
 	public void onFailure(WebSocket webSocket, Throwable t, Response response) {
-		System.err.println("FAILURE! :" + response);
+		log.error(response.toString());
 		t.printStackTrace();
 	}
 }

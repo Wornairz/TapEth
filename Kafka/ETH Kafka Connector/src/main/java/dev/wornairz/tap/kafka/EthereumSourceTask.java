@@ -32,6 +32,7 @@ public class EthereumSourceTask extends SourceTask {
 
 	@Override
 	public List<SourceRecord> poll() throws InterruptedException {
+		//The configuration map is passed by the SourceConnector
 		List<SourceRecord> records = new ArrayList<>();
 		while (!queue.isEmpty()) {
 			String block = queue.remove();

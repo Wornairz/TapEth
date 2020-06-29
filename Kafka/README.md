@@ -36,14 +36,86 @@ Rename the file _eth-source-connector.properties.dist_ into _eth-source-connecto
 ## How TapEth gets the raw data
 
 The data is taken from [Infura](https://infura.io/), a services that provides a [geth](https://geth.ethereum.org/) node. TapEth subscribes to pub/sub "eth_subscribe" method call of the JSON-RPC API, immediately after connecting to the Infura websocket url.<br>
-You can check the [ethereum package](./ETH\ Kafka\ Connector/src/main/java/dev/wornairz/tap/ethereum/) of this project's Kafka Connector for more information.
+[Some calls to the Infura API could result in a null transaction](https://community.infura.io/t/web3-eth-gettransaction-txhash-returns-null/814/4): this bad data is filtered out and not written into the Kafka topic.<br>
+
+```Java
+@Override
+public void onOpen(WebSocket webSocket, Response response) {
+	queue = EthereumBlocksQueue.getInstance();
+	webSocket.send(subscribeJson.toString());
+}
+
+@Override
+public void onMessage(WebSocket webSocket, String text) {
+	JSONObject response = new JSONObject(text);
+	if(response.has("error")) {
+		System.exit(response.getJSONObject("error").getInt("code"));
+	}
+	else if (response.has("params"))
+		sendGetTransactionByHashRequest(webSocket, response);
+	else if (response.has("result"))
+		addResponseToQueue(response);
+}
+```
+
+You can check the <a href="./ETH Kafka Connector/src/main/java/dev/wornairz/tap/ethereum/">ethereum package</a> of this project's Kafka Connector for more information.
 
 ## How TapEth streams the data
 
-In order to create your own Source Kafka Connector, you must create one class that extends **SourceConnector** and one other that extends **SourceTask**. The SourceConnector class is the entrypoint of the Kafka Connector and responsible of configuring and creating the SourceTask(s), that are instead responsible of getting the effective work done and writing the data into the Kafka topic. <br>
-Simply the **poll()** method of the SourceTask is called periodically (default every 3s) by Kafka Connect and here we must return our data.<br>
-[Some calls to the Infura API could result in a null transaction](https://community.infura.io/t/web3-eth-gettransaction-txhash-returns-null/814/4): this bad data is filtered out and not written into the Kafka topic.<br>
-You can check the [kafka package](./ETH\ Kafka\ Connector/src/main/java/dev/wornairz/tap/kafka/) of this project's Kafka Connector for more information.
+In order to create your own Source Kafka Connector, you must create one class that extends **SourceConnector** and one other that extends **SourceTask**.<br>
+The SourceConnector class is the entrypoint of the Kafka Connector and is responsible of configuring and creating the SourceTask(s), that are instead responsible of getting the effective work done and writing the data into the Kafka topic. <br>
+```Java
+public class EthereumSourceConnector extends SourceConnector {
+	@Override
+	public void start(Map<String, String> props) {
+		//Read configuration from .properties file
+		ethereumWssUri = props.get("wss");
+		kafkaTopic = props.get("topic");
+		ethereumWssClient = new EthereumWSSClient(ethereumWssUri);
+		ethereumWssClient.start();
+	}
+
+	@Override
+	public Class<? extends Task> taskClass() {
+		return EthereumSourceTask.class;
+	}
+
+	@Override
+	public List<Map<String, String>> taskConfigs(int maxTasks) {
+		//Write configuration to pass to each task
+		List<Map<String, String>> configs = new ArrayList<>();
+		Map<String, String> config = new HashMap<>();
+		config.put("topic", kafkaTopic);
+		configs.add(config);
+		return configs;
+	}	
+}
+```
+Simply the **poll()** method of the SourceTask is called periodically (default every 3s) by Kafka Connect and here we must return our data. A BlockingQueue is used for easiness.<br>
+```Java
+public class EthereumSourceTask extends SourceTask {
+	@Override
+	public void start(Map<String, String> props) {
+		//The configuration map is passed by the SourceConnector
+		kafkaTopic = props.get("topic");
+		queue = EthereumBlocksQueue.getInstance();
+		count = 0L;
+	}
+
+	@Override
+	public List<SourceRecord> poll() {
+		List<SourceRecord> records = new ArrayList<>();
+		while (!queue.isEmpty()) {
+			String block = queue.remove();
+			SourceRecord record = new SourceRecord(offsetKey(OFFSET_KEY), offsetValue(count++),
+										kafkaTopic, Schema.STRING_SCHEMA, block);
+			records.add(record);
+		}
+		return records;
+	}
+}
+```
+You can check the <a href="./ETH Kafka Connector/src/main/java/dev/wornairz/tap/kafka/">kafka package</a> of this project's Kafka Connector for more information.
 
 ### Creating the Fat Jar
 

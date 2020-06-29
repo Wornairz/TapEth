@@ -7,7 +7,7 @@ It's fault-tolerant.
 
 ## Configuration
 
-Into the ETH Spark Streaming folder, replace the _ethgasstation-apikey.txt.dist_ into _ethgasstation-apikey.txt_, then insert your (ETH Gas Station)[https://docs.ethgasstation.info/] API key.
+Into the ETH Spark Streaming folder, replace the _ethgasstation-apikey.txt.dist_ into _ethgasstation-apikey.txt_, then insert your [ETH Gas Station](https://docs.ethgasstation.info/) API key.
 
 ## Maven dependecies
 
@@ -56,7 +56,7 @@ Into the ETH Spark Streaming folder, replace the _ethgasstation-apikey.txt.dist_
 </dependencies>
 ```
 
-The ```<scope>provided</scope>``` is necessary to tell the Maven compiler to not include those dependencies as they will be provided by the Spark framework.
+The ```<scope>provided</scope>``` is necessary to tell the Maven compiler to not include those dependencies into the jar as they will be provided by the Spark framework.
 
 - Spark Core provides the main Spark API
 - Spark Streaming provides the [Spark Streaming](https://spark.apache.org/docs/latest/streaming-programming-guide.html) extension for Spark
