@@ -6,6 +6,7 @@ import static org.apache.spark.sql.functions.current_timestamp;
 import static org.apache.spark.sql.functions.lit;
 
 import java.io.Serializable;
+import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Map;
@@ -37,13 +38,13 @@ import dev.wornairz.tap.ml.TrainingUtils;
 import dev.wornairz.tap.spark.SparkWrapper;
 import scala.Tuple2;
 
-public class EthSpark implements Serializable{
+public class EthSpark implements Serializable {
 
 	/**
 	 * 
 	 */
 	private static final long serialVersionUID = 1L;
-	
+
 	private SparkWrapper spark;
 	private LinearRegressionModel lrModel;
 	private transient JavaStreamingContext streamingContext;
@@ -51,14 +52,13 @@ public class EthSpark implements Serializable{
 	public EthSpark() throws InterruptedException {
 		spark = SparkWrapper.getInstance();
 		lrModel = TrainingUtils.getLinearRegressionPredictionModel();
-		streamingContext = new JavaStreamingContext(
-				JavaSparkContext.fromSparkContext(spark.getSparkContext()), Durations.seconds(1));
+		streamingContext = new JavaStreamingContext(JavaSparkContext.fromSparkContext(spark.getSparkContext()),
+				Durations.seconds(1));
 		startStreamProcessing();
 	}
-	
+
 	private void startStreamProcessing() throws InterruptedException {
-		getMessageStream()
-				.mapToPair(record -> new Tuple2<>(record.key(), record.value())).map(tuple2 -> tuple2._2)
+		getMessageStream().mapToPair(record -> new Tuple2<>(record.key(), record.value())).map(tuple2 -> tuple2._2)
 				.foreachRDD(rdd -> predictEstimatedTimeThenSendToES(rdd));
 		streamingContext.start();
 		streamingContext.awaitTermination();
@@ -76,22 +76,36 @@ public class EthSpark implements Serializable{
 	private void predictEstimatedTimeThenSendToES(JavaRDD<String> rdd) {
 		Dataset<Row> dataset = spark.convertJsonRDDtoDataset(rdd);
 		if (!dataset.isEmpty()) {
-			dataset = dataset.drop("blockHash", "transactionIndex", "nonce", "input", "r", "s", "v", "blockNumber",
-					"gas", "from", "to", "value", "hash");
-			dataset = dataset.map((MapFunction<Row, Row>) row -> convertGasPriceToDouble(row), RowEncoder.apply(new StructType(new StructField[]{new StructField("gasPrice", DataTypes.DoubleType, false, Metadata.empty())})))
-				.withColumn("gasPrice", conv(col("gasPrice"), 16, 10).cast(DataTypes.DoubleType));
+			dataset = dataset.drop("blockHash", "transactionIndex", "nonce", "input", "r", "s", "v", "blockNumber", "gas");
+			dataset.show();
+			dataset = dataset
+					.map((MapFunction<Row, Row>) row -> convertHexValuesToDouble(row),
+							RowEncoder.apply(new StructType(new StructField[] {
+									new StructField("from", DataTypes.StringType, true, Metadata.empty()),
+									new StructField("to", DataTypes.StringType, true, Metadata.empty()),
+									new StructField("hash", DataTypes.StringType, false, Metadata.empty()),
+									new StructField("value", DataTypes.DoubleType, true, Metadata.empty()),
+									new StructField("gasPrice", DataTypes.DoubleType, false, Metadata.empty()),
+									})));
 			dataset = new VectorAssembler().setInputCols(new String[] { "gasPrice" }).setOutputCol("gas_price")
 					.transform(dataset).drop("gasPrice");
-			Dataset<Row> predictionDataset = lrModel.transform(dataset).withColumn("timestamp", lit(current_timestamp().cast(DataTypes.TimestampType)));
+			Dataset<Row> predictionDataset = lrModel.transform(dataset).withColumn("timestamp",
+					lit(current_timestamp().cast(DataTypes.TimestampType)));
 			predictionDataset.show(100, false);
 			JavaEsSpark.saveJsonToEs(predictionDataset.toJSON().toJavaRDD(), "tap/eth");
 		}
 	}
-	
-	private Row convertGasPriceToDouble(Row row) {
-		String hexGasPrice = row.getString(0).substring(2);
+
+	private Row convertHexValuesToDouble(Row row) {
+		String from = row.getString(0);
+		String hexGasPrice = row.getString(1).substring(2);
+		String hash = row.getString(2);
+		String to = row.getString(3);
+		String hexValue = row.getString(4).substring(2);
 		long gasPriceInWei = Long.parseLong(hexGasPrice, 16);
-		double gasPriceInGwei = gasPriceInWei/1000000000;
-		return RowFactory.create(gasPriceInGwei);
+		double gasPriceInGwei = gasPriceInWei / 1000000000;
+		BigInteger[] valueInEth = new BigInteger(hexValue, 16).divideAndRemainder(new BigInteger("1000000000000000000"));
+		double valueInEthDouble = Double.parseDouble(valueInEth[0].toString() + "." + valueInEth[1].toString());
+		return RowFactory.create(from, to, hash, valueInEthDouble, gasPriceInGwei);
 	}
 }

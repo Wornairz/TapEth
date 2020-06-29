@@ -2,7 +2,7 @@ version: '3.7'
 services: 
   zookeeper:
     image: zookeeper
-    restart: always
+    #restart: always
     ports: 
       - 2181:2181
     container_name: "tap-zookeeper"
